@@ -1,0 +1,2605 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Ausgaben – Haushaltsbuch & Fixkosten</title>
+
+  <!-- PWA / Mobile Web App Meta-Tags -->
+  <meta name="theme-color" content="#0F766E" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Ausgaben" />
+  <meta name="application-name" content="Ausgaben" />
+  <meta name="description" content="Schnelle Verwaltung monatlicher Ausgaben und automatischer Fixkosten." />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#F0FDFA',
+              100: '#CCFBF1',
+              200: '#99F6E4',
+              500: '#14B8A6',
+              600: '#0D9488',
+              700: '#0F766E',
+              800: '#115E59',
+              900: '#134E4A',
+            },
+            gold: {
+              400: '#FBBF24',
+              500: '#F59E0B',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <style>
+    /* Saubere System-Schriftart & Tabular Numbers für exakte Zahlenausrichtung */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #F8FAFC;
+      color: #0F172A;
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: contain;
+    }
+
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Horizontales Scrollen ohne störende Scrollbar */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Sanfte Animationen für Modals & Bottom Sheets */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0.5; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes scaleIn {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .animate-fade-in {
+      animation: fadeIn 0.18s ease-out forwards;
+    }
+    .animate-sheet-up {
+      animation: slideUp 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @media (min-width: 640px) {
+      .animate-sheet-up {
+        animation: scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-brand-100 selection:text-brand-900">
+
+  <!-- ===================================================================== -->
+  <!-- KOPFBEREICH / MONATSNAVIGATION                                        -->
+  <!-- ===================================================================== -->
+  <header class="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200/80">
+    <div class="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between gap-2">
+      <!-- App Logo & Titel -->
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div id="headerAppIcon" class="w-9 h-9 rounded-xl shadow-sm shrink-0 overflow-hidden bg-brand-700 flex items-center justify-center">
+          <!-- Wird per JS mit dem generierten App-Icon befüllt -->
+        </div>
+        <div class="hidden sm:block">
+          <h1 class="text-base font-bold tracking-tight text-slate-900 leading-tight">Ausgaben</h1>
+          <p class="text-[11px] text-slate-500 leading-tight">Haushaltsbuch</p>
+        </div>
+      </div>
+
+      <!-- Monatswechsler -->
+      <div class="flex items-center gap-1 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/60">
+        <button
+          id="prevMonthBtn"
+          type="button"
+          aria-label="Vorheriger Monat"
+          class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:bg-white hover:text-slate-900 active:scale-95 transition"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
+        <button
+          id="currentMonthLabelBtn"
+          type="button"
+          title="Zum aktuellen Monat springen"
+          class="px-3 py-1.5 rounded-xl text-sm sm:text-base font-semibold text-slate-800 hover:bg-white/70 transition min-w-[142px] sm:min-w-[165px] text-center tabular-nums"
+        >
+          November 2026
+        </button>
+
+        <button
+          id="nextMonthBtn"
+          type="button"
+          aria-label="Nächster Monat"
+          class="w-9 h-9 rounded-xl flex items-center justify-center text-slate-600 hover:bg-white hover:text-slate-900 active:scale-95 transition"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Schnellrückkehr & Einstellungen -->
+      <div class="flex items-center gap-1.5">
+        <button
+          id="jumpTodayBtn"
+          type="button"
+          class="hidden text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-brand-50 text-brand-700 border border-brand-200 hover:bg-brand-100 active:scale-95 transition"
+        >
+          Heute
+        </button>
+
+        <button
+          id="openSettingsBtn"
+          type="button"
+          aria-label="Einstellungen & Export"
+          class="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-slate-900 active:scale-95 transition"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===================================================================== -->
+  <!-- HAUPTBEREICH                                                          -->
+  <!-- ===================================================================== -->
+  <main class="flex-1 max-w-3xl w-full mx-auto px-4 pt-4 pb-28 space-y-4">
+
+    <!-- Hinweis-Banner für Beispieldaten (wird nach dem Leeren ausgeblendet) -->
+    <div id="sampleDataBanner" class="hidden bg-amber-50 border border-amber-200/90 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+      <div class="flex items-start sm:items-center gap-2.5 text-xs sm:text-sm text-amber-900">
+        <span class="w-6 h-6 rounded-lg bg-amber-200/70 text-amber-800 flex items-center justify-center shrink-0 font-bold">i</span>
+        <span>Du siehst gerade realistische <strong>Beispieldaten</strong> zum Ausprobieren.</span>
+      </div>
+      <button
+        id="quickClearSampleBtn"
+        type="button"
+        class="shrink-0 text-xs font-semibold px-3 py-1.5 rounded-xl bg-white text-amber-900 border border-amber-300 hover:bg-amber-100 active:scale-95 transition"
+      >
+        Beispieldaten leeren
+      </button>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- ÜBERSICHTSKARTE & MONATSBUDGET                                      -->
+    <!-- =================================================================== -->
+    <section class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <!-- Gesamtausgaben -->
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Gesamtausgaben</span>
+            <span id="monthTrendBadge" class="hidden text-[11px] font-semibold px-2 py-0.5 rounded-full"></span>
+          </div>
+          <div id="totalAmountDisplay" class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight tabular-nums mt-0.5">
+            0,00 €
+          </div>
+        </div>
+
+        <!-- Aufschlüsselung Fixkosten vs. Variable Ausgaben -->
+        <div class="grid grid-cols-2 gap-2.5 sm:w-auto">
+          <button
+            type="button"
+            onclick="switchTab('fixed')"
+            class="text-left bg-slate-50 hover:bg-brand-50/60 border border-slate-200/70 rounded-2xl px-3.5 py-2.5 transition group"
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span class="text-xs font-medium text-slate-500 group-hover:text-brand-700">Fixkosten</span>
+              <span id="fixedCountBadge" class="text-[11px] font-semibold px-1.5 py-0.2 rounded-md bg-slate-200/80 text-slate-600 tabular-nums">0</span>
+            </div>
+            <div id="fixedTotalDisplay" class="text-base sm:text-lg font-bold text-slate-800 tabular-nums mt-0.5">
+              0,00 €
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onclick="switchTab('variable')"
+            class="text-left bg-slate-50 hover:bg-brand-50/60 border border-slate-200/70 rounded-2xl px-3.5 py-2.5 transition group"
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span class="text-xs font-medium text-slate-500 group-hover:text-brand-700">Variabel</span>
+              <span id="variableCountBadge" class="text-[11px] font-semibold px-1.5 py-0.2 rounded-md bg-slate-200/80 text-slate-600 tabular-nums">0</span>
+            </div>
+            <div id="variableTotalDisplay" class="text-base sm:text-lg font-bold text-slate-800 tabular-nums mt-0.5">
+              0,00 €
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Klickbarer Monatsbudget-Bereich -->
+      <div
+        id="budgetCardTrigger"
+        role="button"
+        tabindex="0"
+        class="pt-3.5 border-t border-slate-100 cursor-pointer group rounded-xl -mx-2 px-2 py-1 hover:bg-slate-50/80 transition"
+      >
+        <div class="flex items-center justify-between text-xs sm:text-sm mb-1.5">
+          <div class="flex items-center gap-1.5 text-slate-600 font-medium">
+            <span id="budgetTitleLabel">Monatsbudget</span>
+            <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-brand-600 transition" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </div>
+          <div id="budgetRemainingLabel" class="font-semibold tabular-nums text-emerald-700">
+            Budget festlegen
+          </div>
+        </div>
+
+        <!-- Fortschrittsbalken -->
+        <div id="budgetProgressWrapper" class="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden">
+          <div
+            id="budgetProgressBar"
+            class="h-full rounded-full bg-emerald-600 transition-all duration-300"
+            style="width: 0%"
+          ></div>
+        </div>
+
+        <div id="budgetSubInfo" class="flex items-center justify-between text-[11px] text-slate-400 mt-1 tabular-nums">
+          <span id="budgetUsedRatio">0 % verbraucht</span>
+          <span id="budgetLimitText">Tippen zum Anpassen</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- NAVIGATIONSTABS (SEGMENTED CONTROL)                                 -->
+    <!-- =================================================================== -->
+    <nav class="bg-slate-200/70 p-1 rounded-2xl grid grid-cols-3 gap-1" aria-label="Ansichten">
+      <button
+        id="tabBtnVariable"
+        type="button"
+        onclick="switchTab('variable')"
+        class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 bg-white text-slate-900 shadow-sm"
+      >
+        <span>Ausgaben</span>
+        <span id="tabCountVariable" class="text-[11px] px-1.5 py-0.2 rounded-full bg-brand-100 text-brand-800 tabular-nums">0</span>
+      </button>
+
+      <button
+        id="tabBtnFixed"
+        type="button"
+        onclick="switchTab('fixed')"
+        class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900"
+      >
+        <span>Fixkosten</span>
+        <span id="tabCountFixed" class="text-[11px] px-1.5 py-0.2 rounded-full bg-slate-300/70 text-slate-700 tabular-nums">0</span>
+      </button>
+
+      <button
+        id="tabBtnCategories"
+        type="button"
+        onclick="switchTab('categories')"
+        class="py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900"
+      >
+        <span>Kategorien</span>
+      </button>
+    </nav>
+
+    <!-- =================================================================== -->
+    <!-- ANSICHT 1: VARIABLE AUSGABEN                                        -->
+    <!-- =================================================================== -->
+    <section id="viewVariable" class="space-y-3">
+      <!-- Suche & Kategorie-Filter -->
+      <div class="space-y-2.5">
+        <div class="relative">
+          <svg class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z" />
+          </svg>
+          <input
+            id="searchInput"
+            type="search"
+            placeholder="Ausgaben durchsuchen (z. B. Supermarkt, Kaffee)..."
+            class="w-full bg-white border border-slate-200/90 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600/25 focus:border-brand-600 transition"
+          />
+        </div>
+
+        <!-- Horizontale Kategorie-Filter-Leiste -->
+        <div id="categoryFilterBar" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+          <!-- Wird per JS befüllt -->
+        </div>
+      </div>
+
+      <!-- Gruppierte Ausgabenliste -->
+      <div id="variableExpensesContainer" class="space-y-3.5">
+        <!-- Wird per JS gerendert -->
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- ANSICHT 2: FIXKOSTEN (MONATLICHE ÜBERNAHME)                         -->
+    <!-- =================================================================== -->
+    <section id="viewFixed" class="hidden space-y-3.5">
+      <!-- Info-Karte & Schnell-Button für Fixkosten -->
+      <div class="bg-brand-50/80 border border-brand-200/70 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-start gap-3">
+          <div class="w-9 h-9 rounded-xl bg-brand-700 text-white flex items-center justify-center shrink-0 mt-0.5">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-brand-900">Automatische monatliche Fixkosten</h2>
+            <p class="text-xs text-brand-800/80 mt-0.5 leading-relaxed">
+              Einmal eingetragene Fixkosten erscheinen automatisch jeden Monat in deiner Übersicht.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onclick="openEntryModal('fixed')"
+          class="shrink-0 bg-brand-700 hover:bg-brand-800 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl shadow-sm active:scale-95 transition flex items-center justify-center gap-1.5"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          <span>Fixkosten hinzufügen</span>
+        </button>
+      </div>
+
+      <!-- Liste aktiver Fixkosten im gewählten Monat -->
+      <div id="fixedExpensesContainer" class="space-y-2.5">
+        <!-- Wird per JS gerendert -->
+      </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- ANSICHT 3: KATEGORIE-VERTEILUNG (VISUELLE AUSWERTUNG)               -->
+    <!-- =================================================================== -->
+    <section id="viewCategories" class="hidden space-y-3.5">
+      <div class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 space-y-5">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-base font-bold text-slate-900">Ausgaben nach Kategorie</h2>
+          <div class="inline-flex bg-slate-100 p-1 rounded-xl text-xs font-semibold">
+            <button type="button" data-cat-scope="all" class="cat-scope-btn px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-sm">Gesamt</button>
+            <button type="button" data-cat-scope="variable" class="cat-scope-btn px-2.5 py-1 rounded-lg text-slate-600">Variabel</button>
+            <button type="button" data-cat-scope="fixed" class="cat-scope-btn px-2.5 py-1 rounded-lg text-slate-600">Fixkosten</button>
+          </div>
+        </div>
+
+        <!-- SVG Donut-Diagramm + Legende -->
+        <div id="categoryChartWrapper" class="flex flex-col sm:flex-row items-center gap-6">
+          <!-- Wird per JS gerendert -->
+        </div>
+
+        <!-- Detaillierte Kategorie-Balken -->
+        <div id="categoryBarsContainer" class="space-y-3 pt-2 border-t border-slate-100">
+          <!-- Wird per JS gerendert -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- FLOATING ACTION BUTTON (+) FÜR SCHNELLEINGABE                         -->
+  <!-- ===================================================================== -->
+  <button
+    id="fabAddBtn"
+    type="button"
+    aria-label="Neue Ausgabe schnell erfassen"
+    class="fixed bottom-6 right-5 sm:right-8 z-30 w-15 h-15 w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-brand-700 hover:bg-brand-800 text-white shadow-xl shadow-brand-900/25 flex items-center justify-center active:scale-90 transition-all focus:outline-none focus:ring-4 focus:ring-brand-500/30"
+  >
+    <svg class="w-7 h-7 sm:w-8 sm:h-8" fill="none" stroke="currentColor" stroke-width="2.6" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+    </svg>
+  </button>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 1: SCHNELL-EINGABE & BEARBEITUNG (BOTTOM-SHEET / DIALOG)        -->
+  <!-- ===================================================================== -->
+  <div id="entryModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center">
+    <!-- Backdrop -->
+    <div id="entryModalBackdrop" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs animate-fade-in"></div>
+
+    <!-- Modal Container -->
+    <div class="relative z-10 w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200/80 max-h-[92vh] flex flex-col animate-sheet-up">
+      <!-- Drag-Handle auf Mobilgeräten -->
+      <div class="sm:hidden flex justify-center pt-2.5 pb-1">
+        <div class="w-10 h-1 rounded-full bg-slate-300"></div>
+      </div>
+
+      <!-- Kopfbereich Modal -->
+      <div class="px-5 pt-3 pb-3 border-b border-slate-100 flex items-center justify-between gap-2">
+        <h2 id="entryModalTitle" class="text-base font-bold text-slate-900">Neue Ausgabe</h2>
+        <button
+          id="closeEntryModalBtn"
+          type="button"
+          aria-label="Schließen"
+          class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-800 flex items-center justify-center transition"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Scrollbarer Formular-Inhalt -->
+      <form id="entryForm" class="p-5 overflow-y-auto space-y-4">
+        <!-- Typ-Umschalter: Variable Ausgabe vs. Monatliche Fixkosten -->
+        <div id="entryTypeSwitcher" class="grid grid-cols-2 gap-1.5 bg-slate-100 p-1 rounded-2xl">
+          <button
+            type="button"
+            id="typeBtnVariable"
+            onclick="setEntryFormType('variable')"
+            class="py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-white text-slate-900 shadow-sm transition"
+          >
+            Variable Ausgabe
+          </button>
+          <button
+            type="button"
+            id="typeBtnFixed"
+            onclick="setEntryFormType('fixed')"
+            class="py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition"
+          >
+            Monatliche Fixkosten
+          </button>
+        </div>
+
+        <!-- Betrag-Eingabe (groß, direkt fokussiert, Komma & Punkt unterstützt) -->
+        <div class="bg-slate-50 border border-slate-200/90 focus-within:border-brand-600 focus-within:ring-2 focus-within:ring-brand-600/20 rounded-2xl px-4 py-3 transition">
+          <label for="entryAmountInput" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            Betrag in Euro
+          </label>
+          <div class="flex items-baseline gap-2 mt-0.5">
+            <input
+              id="entryAmountInput"
+              type="text"
+              inputmode="decimal"
+              autocomplete="off"
+              placeholder="0,00"
+              class="w-full bg-transparent text-3xl font-extrabold text-slate-900 placeholder:text-slate-300 focus:outline-none tabular-nums"
+            />
+            <span class="text-2xl font-bold text-slate-400 select-none">€</span>
+          </div>
+          <p id="entryAmountError" class="hidden text-xs text-rose-600 font-medium mt-1">Bitte gib einen gültigen Betrag größer als 0 € ein.</p>
+        </div>
+
+        <!-- 1-Tap Schnell-Vorlagen (Quick-Presets) -->
+        <div id="quickPresetsSection" class="space-y-1.5">
+          <span class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            1-Tap Schnellwahl
+          </span>
+          <div id="quickPresetsContainer" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+            <!-- Wird je nach Modus (Variabel / Fixkosten) per JS befüllt -->
+          </div>
+        </div>
+
+        <!-- Beschreibung / Titel -->
+        <div>
+          <label for="entryTitleInput" class="block text-xs font-semibold text-slate-700 mb-1">
+            Beschreibung <span class="text-slate-400 font-normal">(optional – sonst Kategoriename)</span>
+          </label>
+          <input
+            id="entryTitleInput"
+            type="text"
+            maxlength="60"
+            placeholder="z. B. Wocheneinkauf, Kaffee, Miete..."
+            class="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-600/25 focus:border-brand-600 transition"
+          />
+        </div>
+
+        <!-- Kategorie-Chips -->
+        <div>
+          <span class="block text-xs font-semibold text-slate-700 mb-1.5">Kategorie</span>
+          <div id="entryCategoryGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            <!-- Wird per JS befüllt -->
+          </div>
+        </div>
+
+        <!-- Datum (für Variable Ausgaben) -->
+        <div id="variableDateSection" class="space-y-1.5">
+          <span class="block text-xs font-semibold text-slate-700">Datum</span>
+          <div class="flex items-center gap-2">
+            <button
+              type="button"
+              id="dateQuickTodayBtn"
+              class="px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 bg-slate-50 text-slate-700 hover:bg-brand-50 hover:border-brand-300 hover:text-brand-800 transition"
+            >
+              Heute
+            </button>
+            <button
+              type="button"
+              id="dateQuickYesterdayBtn"
+              class="px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 bg-slate-50 text-slate-700 hover:bg-brand-50 hover:border-brand-300 hover:text-brand-800 transition"
+            >
+              Gestern
+            </button>
+            <input
+              id="entryDateInput"
+              type="date"
+              class="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-sm text-slate-800 tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-600/25 focus:border-brand-600"
+            />
+          </div>
+        </div>
+
+        <!-- Zusatzoptionen für Fixkosten -->
+        <div id="fixedOptionsSection" class="hidden space-y-2.5 bg-brand-50/70 border border-brand-200/70 rounded-2xl p-3.5">
+          <div class="flex items-center justify-between gap-3">
+            <label for="fixedBillingDayInput" class="text-xs font-semibold text-brand-900">
+              Abbuchungstag im Monat
+            </label>
+            <div class="flex items-center gap-1.5">
+              <span class="text-xs text-brand-800">zum</span>
+              <input
+                id="fixedBillingDayInput"
+                type="number"
+                min="1"
+                max="31"
+                value="1"
+                class="w-16 bg-white border border-brand-300 rounded-xl px-2.5 py-1.5 text-sm font-semibold text-center text-slate-900 tabular-nums focus:outline-none focus:ring-2 focus:ring-brand-600/30"
+              />
+              <span class="text-xs text-brand-800">. des Monats</span>
+            </div>
+          </div>
+          <p id="fixedStartMonthHint" class="text-[11px] text-brand-800/90">
+            Wird automatisch ab November 2026 in jeden folgenden Monat übernommen.
+          </p>
+        </div>
+
+        <!-- Speichern-Button -->
+        <div class="pt-1">
+          <button
+            type="submit"
+            id="saveEntrySubmitBtn"
+            class="w-full py-3.5 px-5 rounded-2xl bg-brand-700 hover:bg-brand-800 text-white font-bold text-sm sm:text-base shadow-md shadow-brand-900/15 active:scale-[0.99] transition"
+          >
+            Ausgabe speichern
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 2: MONATSBUDGET BEARBEITEN                                      -->
+  <!-- ===================================================================== -->
+  <div id="budgetModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center">
+    <div id="budgetModalBackdrop" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs animate-fade-in"></div>
+    <div class="relative z-10 w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200/80 p-5 space-y-4 animate-sheet-up">
+      <div class="flex items-center justify-between">
+        <h2 class="text-base font-bold text-slate-900">Monatsbudget festlegen</h2>
+        <button type="button" onclick="closeBudgetModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <form id="budgetForm" class="space-y-4">
+        <div class="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
+          <label for="budgetAmountInput" class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            Monatliches Limit (0 = deaktiviert)
+          </label>
+          <div class="flex items-baseline gap-2 mt-0.5">
+            <input
+              id="budgetAmountInput"
+              type="text"
+              inputmode="decimal"
+              placeholder="2.000,00"
+              class="w-full bg-transparent text-2xl font-extrabold text-slate-900 focus:outline-none tabular-nums"
+            />
+            <span class="text-xl font-bold text-slate-400">€</span>
+          </div>
+        </div>
+
+        <!-- Schnellwahl-Beträge -->
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button" onclick="setBudgetPreset(1500)" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-brand-50 hover:text-brand-800 text-slate-700 tabular-nums transition">1.500 €</button>
+          <button type="button" onclick="setBudgetPreset(2000)" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-brand-50 hover:text-brand-800 text-slate-700 tabular-nums transition">2.000 €</button>
+          <button type="button" onclick="setBudgetPreset(2500)" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-brand-50 hover:text-brand-800 text-slate-700 tabular-nums transition">2.500 €</button>
+          <button type="button" onclick="setBudgetPreset(3000)" class="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-brand-50 hover:text-brand-800 text-slate-700 tabular-nums transition">3.000 €</button>
+        </div>
+
+        <!-- Budget-Bezug (Gesamt vs. Nur Variable Ausgaben) -->
+        <div class="space-y-1.5">
+          <span class="block text-xs font-semibold text-slate-700">Worauf bezieht sich das Budget?</span>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="cursor-pointer">
+              <input type="radio" name="budgetScope" value="total" class="peer sr-only" checked />
+              <div class="p-3 rounded-2xl border border-slate-200 peer-checked:border-brand-600 peer-checked:bg-brand-50/70 transition">
+                <div class="text-xs font-bold text-slate-900">Gesamtausgaben</div>
+                <div class="text-[11px] text-slate-500 mt-0.5">Fixkosten + Variabel</div>
+              </div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="budgetScope" value="variable" class="peer sr-only" />
+              <div class="p-3 rounded-2xl border border-slate-200 peer-checked:border-brand-600 peer-checked:bg-brand-50/70 transition">
+                <div class="text-xs font-bold text-slate-900">Nur Variabel</div>
+                <div class="text-[11px] text-slate-500 mt-0.5">Alltags-Taschengeld</div>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-3 rounded-2xl bg-brand-700 hover:bg-brand-800 text-white font-bold text-sm shadow-sm transition">
+          Budget speichern
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 3: FIXKOSTEN AKTION (BEENDEN / LÖSCHEN / PREISÄNDERUNG)         -->
+  <!-- ===================================================================== -->
+  <div id="fixedActionModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+    <div id="fixedActionBackdrop" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs animate-fade-in"></div>
+    <div class="relative z-10 w-full sm:max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200/80 p-5 space-y-4 animate-sheet-up">
+      <div>
+        <h3 id="fixedActionTitle" class="text-base font-bold text-slate-900">Fixkosten entfernen</h3>
+        <p id="fixedActionDesc" class="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed"></p>
+      </div>
+      <div id="fixedActionButtons" class="space-y-2">
+        <!-- Dynamische Aktionsbuttons -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL 4: EINSTELLUNGEN, APP-ICON & BACKUP                             -->
+  <!-- ===================================================================== -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-40 flex items-end sm:items-center justify-center">
+    <div id="settingsModalBackdrop" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs animate-fade-in"></div>
+    <div class="relative z-10 w-full sm:max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200/80 max-h-[90vh] flex flex-col animate-sheet-up">
+      <div class="px-5 pt-4 pb-3 border-b border-slate-100 flex items-center justify-between">
+        <h2 class="text-base font-bold text-slate-900">Einstellungen & Datensicherung</h2>
+        <button type="button" onclick="closeSettingsModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-5">
+        <!-- App-Icon & Home-Screen-Integration -->
+        <div class="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-3">
+          <div class="flex items-center gap-3.5">
+            <div id="settingsIconPreview" class="w-16 h-16 rounded-2xl shadow-md shrink-0 overflow-hidden bg-brand-700">
+              <!-- PNG/SVG Vorschau -->
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-sm font-bold text-slate-900">App-Icon & Startbildschirm</h3>
+              <p class="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                Automatisch als App-Icon integriert. Tippe im Browser auf <strong>„Teilen → Zum Home-Bildschirm“</strong> (iOS) oder <strong>„App installieren“</strong> (Android).
+              </p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button
+              type="button"
+              id="downloadIconPngBtn"
+              class="py-2 px-3 rounded-xl bg-white hover:bg-brand-50 text-slate-800 hover:text-brand-800 border border-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+            >
+              <svg class="w-4 h-4 text-brand-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3" />
+              </svg>
+              <span>Icon als PNG</span>
+            </button>
+
+            <button
+              type="button"
+              id="downloadIconSvgBtn"
+              class="py-2 px-3 rounded-xl bg-white hover:bg-brand-50 text-slate-800 hover:text-brand-800 border border-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+            >
+              <svg class="w-4 h-4 text-brand-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V3" />
+              </svg>
+              <span>Icon als SVG</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Backup & CSV-Export -->
+        <div class="space-y-2.5">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Backup & Tabellen-Export</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              type="button"
+              id="exportJsonBtn"
+              class="py-2.5 px-3.5 rounded-xl bg-brand-700 hover:bg-brand-800 text-white text-xs font-semibold flex items-center justify-center gap-2 transition"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+              </svg>
+              <span>JSON-Backup speichern</span>
+            </button>
+
+            <label class="cursor-pointer py-2.5 px-3.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-xs font-semibold flex items-center justify-center gap-2 transition">
+              <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <span>JSON-Backup laden</span>
+              <input id="importJsonInput" type="file" accept=".json,application/json" class="hidden" />
+            </label>
+
+            <button
+              type="button"
+              id="exportCsvMonthBtn"
+              class="py-2.5 px-3.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition"
+            >
+              <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>CSV-Export (Monat)</span>
+            </button>
+
+            <button
+              type="button"
+              id="exportCsvAllBtn"
+              class="py-2.5 px-3.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 text-xs font-semibold flex items-center justify-center gap-2 transition"
+            >
+              <svg class="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>CSV-Export (Gesamt)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Daten zurücksetzen -->
+        <div class="pt-3 border-t border-slate-100 space-y-2">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Datenverwaltung</h3>
+          <div id="resetDataDefaultArea">
+            <button
+              type="button"
+              id="triggerResetConfirmBtn"
+              class="w-full py-2.5 px-4 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 text-xs font-semibold transition"
+            >
+              Beispieldaten leeren / Alle Daten zurücksetzen
+            </button>
+          </div>
+          <div id="resetDataConfirmArea" class="hidden bg-rose-50 border border-rose-200 rounded-2xl p-3 space-y-2.5">
+            <p class="text-xs text-rose-900 font-medium">
+              Möchtest du wirklich alle Ausgaben und Fixkosten unwiderruflich löschen und mit 0,00 € starten?
+            </p>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                id="confirmClearAllBtn"
+                class="flex-1 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition"
+              >
+                Ja, komplett leeren
+              </button>
+              <button
+                type="button"
+                id="cancelClearAllBtn"
+                class="py-2 px-3 rounded-xl bg-white text-slate-700 border border-slate-200 text-xs font-semibold transition"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- TOAST-BENACHRICHTIGUNG (INKL. RÜCKGÄNGIG-OPTION)                      -->
+  <!-- ===================================================================== -->
+  <div
+    id="toastBanner"
+    class="hidden fixed bottom-24 sm:bottom-8 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50 bg-slate-900 text-white text-xs sm:text-sm font-medium px-4 py-3 rounded-2xl shadow-xl flex items-center justify-between sm:justify-center gap-4 max-w-md"
+  >
+    <span id="toastMessage">Gespeichert</span>
+    <button
+      id="toastUndoBtn"
+      type="button"
+      class="hidden text-gold-400 hover:text-amber-300 font-bold uppercase tracking-wide text-xs shrink-0"
+    >
+      Rückgängig
+    </button>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- JAVASCRIPT LOGIK                                                      -->
+  <!-- ===================================================================== -->
+  <script>
+    "use strict";
+
+    /* =======================================================================
+       1. APP-ICON SVG & DYNAMISCHE PWA / HOME-SCREEN INTEGRATION
+       ======================================================================= */
+    const APP_ICON_SVG = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+        <defs>
+          <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#0F766E" />
+            <stop offset="100%" stop-color="#115E59" />
+          </linearGradient>
+          <radialGradient id="topGlow" cx="20%" cy="15%" r="75%">
+            <stop offset="0%" stop-color="#2DD4BF" stop-opacity="0.28" />
+            <stop offset="100%" stop-color="#0F766E" stop-opacity="0" />
+          </radialGradient>
+          <linearGradient id="walletGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#FFFFFF" />
+            <stop offset="100%" stop-color="#F1F5F9" />
+          </linearGradient>
+          <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#FDE68A" />
+            <stop offset="45%" stop-color="#FBBF24" />
+            <stop offset="100%" stop-color="#D97706" />
+          </linearGradient>
+        </defs>
+
+        <!-- Abgerundetes App-Icon-Quadrat -->
+        <rect x="0" y="0" width="512" height="512" rx="116" fill="url(#bgGrad)" />
+        <rect x="0" y="0" width="512" height="512" rx="116" fill="url(#topGlow)" />
+        <rect x="6" y="6" width="500" height="500" rx="111" fill="none" stroke="#FFFFFF" stroke-opacity="0.16" stroke-width="4" />
+
+        <!-- Hintere Kartenlasche -->
+        <rect x="116" y="146" width="248" height="120" rx="28" fill="#CCFBF1" fill-opacity="0.24" />
+
+        <!-- Goldene Euro-Münze oben rechts -->
+        <circle cx="348" cy="176" r="66" fill="url(#goldGrad)" />
+        <circle cx="348" cy="176" r="52" fill="none" stroke="#FEF3C7" stroke-opacity="0.65" stroke-width="3.5" />
+        <text x="348" y="198" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="800" font-size="64" fill="#78350F">€</text>
+
+        <!-- Haupt-Wallet-Körper in Weiß -->
+        <rect x="98" y="192" width="316" height="206" rx="40" fill="url(#walletGrad)" />
+
+        <!-- Minimalistische Balkendiagramm-Linien im Wallet -->
+        <rect x="142" y="294" width="28" height="62" rx="10" fill="#99F6E4" />
+        <rect x="186" y="264" width="28" height="92" rx="10" fill="#14B8A6" />
+        <rect x="230" y="236" width="28" height="120" rx="10" fill="#0F766E" />
+
+        <!-- Wallet-Verschlusslasche rechts -->
+        <rect x="308" y="264" width="118" height="62" rx="22" fill="#0F766E" />
+        <circle cx="340" cy="295" r="13" fill="#FBBF24" />
+      </svg>
+    `.trim();
+
+    let generatedIconPng512 = null;
+    let generatedIconPng180 = null;
+
+    /**
+     * Wandelt das SVG-Icon über ein unsichtbares Canvas in hochauflösende PNGs (180x180 & 512x512) um
+     * und verankert Favicon, Apple-Touch-Icon und Web-App-Manifest dynamisch im <head>.
+     */
+    function initDynamicAppIconAndManifest() {
+      // Vorschauen direkt im UI setzen
+      const headerIconEl = document.getElementById("headerAppIcon");
+      const settingsIconEl = document.getElementById("settingsIconPreview");
+      if (headerIconEl) {
+        headerIconEl.innerHTML = APP_ICON_SVG.replace('width="512" height="512"', 'class="w-full h-full"');
+      }
+      if (settingsIconEl) {
+        settingsIconEl.innerHTML = APP_ICON_SVG.replace('width="512" height="512"', 'class="w-full h-full"');
+      }
+
+      try {
+        const svgBlob = new Blob([APP_ICON_SVG], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(svgBlob);
+        const img = new Image();
+
+        img.onload = function () {
+          // 512x512 PNG rendern
+          const canvas512 = document.createElement("canvas");
+          canvas512.width = 512;
+          canvas512.height = 512;
+          const ctx512 = canvas512.getContext("2d");
+          ctx512.drawImage(img, 0, 0, 512, 512);
+          generatedIconPng512 = canvas512.toDataURL("image/png");
+
+          // 180x180 PNG rendern (iOS Home-Screen)
+          const canvas180 = document.createElement("canvas");
+          canvas180.width = 180;
+          canvas180.height = 180;
+          const ctx180 = canvas180.getContext("2d");
+          ctx180.drawImage(img, 0, 0, 180, 180);
+          generatedIconPng180 = canvas180.toDataURL("image/png");
+
+          URL.revokeObjectURL(url);
+
+          // <link rel="icon"> injizieren
+          upsertHeadLink("icon", {
+            type: "image/png",
+            sizes: "512x512",
+            href: generatedIconPng512
+          });
+
+          // <link rel="apple-touch-icon"> injizieren
+          upsertHeadLink("apple-touch-icon", {
+            sizes: "180x180",
+            href: generatedIconPng180
+          });
+
+          // <link rel="manifest"> als Data-URL injizieren
+          const manifestObj = {
+            name: "Ausgaben – Haushaltsbuch",
+            short_name: "Ausgaben",
+            description: "Schnelle Verwaltung monatlicher Ausgaben und automatischer Fixkosten.",
+            start_url: ".",
+            display: "standalone",
+            background_color: "#F8FAFC",
+            theme_color: "#0F766E",
+            lang: "de",
+            icons: [
+              {
+                src: generatedIconPng180,
+                sizes: "180x180",
+                type: "image/png"
+              },
+              {
+                src: generatedIconPng512,
+                sizes: "512x512",
+                type: "image/png",
+                purpose: "any maskable"
+              }
+            ]
+          };
+
+          const manifestDataUrl =
+            "data:application/manifest+json;charset=utf-8," +
+            encodeURIComponent(JSON.stringify(manifestObj));
+
+          upsertHeadLink("manifest", { href: manifestDataUrl });
+        };
+
+        img.src = url;
+      } catch (err) {
+        console.warn("App-Icon-Generierung eingeschränkt:", err);
+      }
+    }
+
+    function upsertHeadLink(rel, attrs) {
+      let link = document.querySelector(`link[rel="${rel}"]`);
+      if (!link) {
+        link = document.createElement("link");
+        link.rel = rel;
+        document.head.appendChild(link);
+      }
+      Object.entries(attrs).forEach(([k, v]) => link.setAttribute(k, v));
+    }
+
+    /* =======================================================================
+       2. KATEGORIEN, VORLAGEN & DATUMS-HILFSFUNKTIONEN
+       ======================================================================= */
+    const CATEGORIES = [
+      {
+        id: "lebensmittel",
+        name: "Lebensmittel",
+        color: "#059669",
+        bgClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        dotClass: "bg-emerald-600",
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>`
+      },
+      {
+        id: "wohnen",
+        name: "Wohnen",
+        color: "#2563EB",
+        bgClass: "bg-blue-50 text-blue-700 border-blue-200",
+        dotClass: "bg-blue-600",
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>`
+      },
+      {
+        id: "mobilitaet",
+        name: "Mobilität",
+        color: "#D97706",
+        bgClass: "bg-amber-50 text-amber-700 border-amber-200",
+        dotClass: "bg-amber-600",
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h8m-8 5h8m-4-9v18m-7-4h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>`
+      },
+      {
+        id: "freizeit",
+        name: "Freizeit & Gastro",
+        color: "#7C3AED",
+        bgClass: "bg-violet-50 text-violet-700 border-violet-200",
+        dotClass: "bg-violet-600",
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8zm4-4v2m4-2v2m4-2v2"/></svg>`
+      },
+      {
+        id: "einkauf",
+        name: "Einkauf",
+        color: "#DB2777",
+        bgClass: "bg-pink-50 text-pink-700 border-pink-200",
+        dotClass: "bg-pink-600",
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>`
+      },
+      {
+        id: "gesundheit",
+        name: "Gesundheit",
+        color: "#0D9488",
+        bgClass: "bg-teal-50 text-teal-700 border-teal-200",
+        dotClass: "bg-teal-600",
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>`
+      },
+      {
+        id: "abos",
+        name: "Abos & Verträge",
+        color: "#4F46E5",
+        bgClass: "bg-indigo-50 text-indigo-700 border-indigo-200",
+        dotClass: "bg-indigo-600",
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>`
+      },
+      {
+        id: "sonstiges",
+        name: "Sonstiges",
+        color: "#475569",
+        bgClass: "bg-slate-100 text-slate-700 border-slate-200",
+        dotClass: "bg-slate-600",
+        icon: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/></svg>`
+      }
+    ];
+
+    const VARIABLE_PRESETS = [
+      { label: "Supermarkt", title: "Supermarkt", category: "lebensmittel", amount: null },
+      { label: "Kaffee / Bäcker 3,80 €", title: "Kaffee / Bäcker", category: "freizeit", amount: 3.80 },
+      { label: "Essen gehen", title: "Essen gehen", category: "freizeit", amount: null },
+      { label: "Drogerie", title: "Drogerie", category: "einkauf", amount: null },
+      { label: "Tanken / ÖPNV", title: "Tanken / ÖPNV", category: "mobilitaet", amount: null },
+      { label: "Apotheke", title: "Apotheke", category: "gesundheit", amount: null }
+    ];
+
+    const FIXED_PRESETS = [
+      { label: "Miete", title: "Miete (Warm)", category: "wohnen", amount: null, day: 1 },
+      { label: "Deutschlandticket 58 €", title: "Deutschlandticket", category: "mobilitaet", amount: 58.00, day: 1 },
+      { label: "Internet / Handy", title: "Internet & Mobilfunk", category: "abos", amount: null, day: 15 },
+      { label: "Strom / Gas", title: "Stromabschlag", category: "wohnen", amount: null, day: 1 },
+      { label: "Fitnessstudio", title: "Fitnessstudio", category: "gesundheit", amount: null, day: 1 },
+      { label: "Streaming-Abo", title: "Streaming-Abo", category: "abos", amount: null, day: 10 }
+    ];
+
+    const MONTH_NAMES_DE = [
+      "Januar", "Februar", "März", "April", "Mai", "Juni",
+      "Juli", "August", "September", "Oktober", "November", "Dezember"
+    ];
+
+    const MONTH_SHORT_DE = [
+      "Jan.", "Feb.", "März", "Apr.", "Mai", "Juni",
+      "Juli", "Aug.", "Sep.", "Okt.", "Nov.", "Dez."
+    ];
+
+    const WEEKDAYS_DE = [
+      "Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"
+    ];
+
+    const eurFormatter = new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+
+    function formatEuro(amount) {
+      return eurFormatter.format(amount || 0);
+    }
+
+    /**
+     * Parst deutsche und internationale Betragseingaben zuverlässig (z. B. "12,50", "1.250,00", "12.50")
+     */
+    function parseEuroInput(raw) {
+      if (!raw) return NaN;
+      let cleaned = String(raw).trim().replace(/€/g, "").replace(/\s+/g, "");
+      if (cleaned.includes(",") && cleaned.includes(".")) {
+        // Punkt als Tausendertrennzeichen entfernen, Komma als Dezimalpunkt nutzen
+        cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+      } else {
+        cleaned = cleaned.replace(",", ".");
+      }
+      const num = parseFloat(cleaned);
+      if (!Number.isFinite(num)) return NaN;
+      return Math.round(num * 100) / 100;
+    }
+
+    function pad2(n) {
+      return String(n).padStart(2, "0");
+    }
+
+    function getLocalTodayISO() {
+      const now = new Date();
+      return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
+    }
+
+    function getLocalYesterdayISO() {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    }
+
+    function getCurrentYearMonth() {
+      return getLocalTodayISO().slice(0, 7);
+    }
+
+    function addMonths(ym, delta) {
+      const [y, m] = ym.split("-").map(Number);
+      const date = new Date(y, m - 1 + delta, 1);
+      return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
+    }
+
+    function formatMonthYearDE(ym) {
+      const [y, m] = ym.split("-").map(Number);
+      return `${MONTH_NAMES_DE[m - 1]} ${y}`;
+    }
+
+    function formatShortMonthYearDE(ym) {
+      const [y, m] = ym.split("-").map(Number);
+      return `${MONTH_SHORT_DE[m - 1]} ${y}`;
+    }
+
+    function formatGroupDateDE(isoDate) {
+      const today = getLocalTodayISO();
+      const yesterday = getLocalYesterdayISO();
+      if (isoDate === today) return "Heute";
+      if (isoDate === yesterday) return "Gestern";
+      const [y, m, d] = isoDate.split("-").map(Number);
+      const dt = new Date(y, m - 1, d);
+      return `${WEEKDAYS_DE[dt.getDay()]}, ${d}. ${MONTH_SHORT_DE[m - 1]}`;
+    }
+
+    function getCategoryById(id) {
+      return CATEGORIES.find((c) => c.id === id) || CATEGORIES[CATEGORIES.length - 1];
+    }
+
+    function generateId(prefix = "id") {
+      return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    /* =======================================================================
+       3. DATENHALTUNG (LOCALSTORAGE & BEISPIELDATEN)
+       ======================================================================= */
+    const STORAGE_KEY = "ausgaben_tracker_data_v1";
+
+    let appState = {
+      selectedMonth: getCurrentYearMonth(),
+      activeTab: "variable", // 'variable' | 'fixed' | 'categories'
+      searchQuery: "",
+      categoryFilter: "all",
+      categoryChartScope: "all", // 'all' | 'variable' | 'fixed'
+      data: {
+        isSampleData: false,
+        budget: {
+          amount: 2200,
+          scope: "total" // 'total' | 'variable'
+        },
+        expenses: [], // { id, title, amount, category, date: 'YYYY-MM-DD' }
+        fixedExpenses: [] // { id, title, amount, category, dayOfMonth, startMonth: 'YYYY-MM', endMonth: null | 'YYYY-MM' }
+      }
+    };
+
+    function createInitialSampleData() {
+      const currentYM = getCurrentYearMonth();
+      const prevYM = addMonths(currentYM, -1);
+      const todayISO = getLocalTodayISO();
+      const yesterdayISO = getLocalYesterdayISO();
+      const firstOfMonthISO = `${currentYM}-01`;
+
+      return {
+        isSampleData: true,
+        budget: {
+          amount: 2200,
+          scope: "total"
+        },
+        fixedExpenses: [
+          {
+            id: "fix_sample_1",
+            title: "Miete (Warm)",
+            amount: 950.00,
+            category: "wohnen",
+            dayOfMonth: 1,
+            startMonth: prevYM,
+            endMonth: null
+          },
+          {
+            id: "fix_sample_2",
+            title: "Deutschlandticket",
+            amount: 58.00,
+            category: "mobilitaet",
+            dayOfMonth: 1,
+            startMonth: prevYM,
+            endMonth: null
+          },
+          {
+            id: "fix_sample_3",
+            title: "Internet & Mobilfunk",
+            amount: 39.99,
+            category: "abos",
+            dayOfMonth: 15,
+            startMonth: prevYM,
+            endMonth: null
+          }
+        ],
+        expenses: [
+          {
+            id: "exp_sample_1",
+            title: "Wocheneinkauf Supermarkt",
+            amount: 64.80,
+            category: "lebensmittel",
+            date: todayISO
+          },
+          {
+            id: "exp_sample_2",
+            title: "Kaffee & Croissant",
+            amount: 4.50,
+            category: "freizeit",
+            date: yesterdayISO
+          },
+          {
+            id: "exp_sample_3",
+            title: "Drogerie-Einkauf",
+            amount: 18.90,
+            category: "einkauf",
+            date: firstOfMonthISO
+          }
+        ]
+      };
+    }
+
+    function loadData() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          appState.data = createInitialSampleData();
+          saveData();
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        appState.data = {
+          isSampleData: Boolean(parsed.isSampleData),
+          budget: {
+            amount: Number(parsed.budget?.amount) || 0,
+            scope: parsed.budget?.scope === "variable" ? "variable" : "total"
+          },
+          expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
+          fixedExpenses: Array.isArray(parsed.fixedExpenses) ? parsed.fixedExpenses : []
+        };
+      } catch (e) {
+        console.error("Fehler beim Laden aus localStorage:", e);
+        appState.data = createInitialSampleData();
+      }
+    }
+
+    function saveData() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(appState.data));
+      } catch (e) {
+        showToast("Speicher voll – bitte JSON-Backup erstellen.");
+      }
+    }
+
+    /**
+     * Ermittelt alle aktiven Fixkosten für einen bestimmten Monat (YYYY-MM).
+     * Eine Fixkosten-Position ist aktiv, wenn startMonth <= ym UND (endMonth === null || endMonth >= ym).
+     */
+    function getActiveFixedForMonth(ym) {
+      return appState.data.fixedExpenses
+        .filter((item) => {
+          if (item.startMonth > ym) return false;
+          if (item.endMonth && item.endMonth < ym) return false;
+          return true;
+        })
+        .sort((a, b) => (a.dayOfMonth || 1) - (b.dayOfMonth || 1));
+    }
+
+    /**
+     * Ermittelt alle variablen Ausgaben für einen bestimmten Monat (YYYY-MM).
+     */
+    function getVariableForMonth(ym) {
+      return appState.data.expenses
+        .filter((exp) => exp.date && exp.date.startsWith(ym))
+        .sort((a, b) => b.date.localeCompare(a.date));
+    }
+
+    /* =======================================================================
+       4. UI-RENDERING: MONATSÜBERSICHT, BUDGET, LISTEN & DIAGRAMME
+       ======================================================================= */
+    function renderAll() {
+      const ym = appState.selectedMonth;
+      const realCurrentYM = getCurrentYearMonth();
+
+      // Monatsanzeige & Heute-Button
+      document.getElementById("currentMonthLabelBtn").textContent = formatMonthYearDE(ym);
+      const jumpTodayBtn = document.getElementById("jumpTodayBtn");
+      if (ym !== realCurrentYM) {
+        jumpTodayBtn.classList.remove("hidden");
+      } else {
+        jumpTodayBtn.classList.add("hidden");
+      }
+
+      // Beispieldaten-Banner
+      const sampleBanner = document.getElementById("sampleDataBanner");
+      if (appState.data.isSampleData) {
+        sampleBanner.classList.remove("hidden");
+      } else {
+        sampleBanner.classList.add("hidden");
+      }
+
+      // Summen berechnen
+      const activeFixed = getActiveFixedForMonth(ym);
+      const monthVariable = getVariableForMonth(ym);
+
+      const fixedSum = activeFixed.reduce((sum, item) => sum + item.amount, 0);
+      const variableSum = monthVariable.reduce((sum, item) => sum + item.amount, 0);
+      const totalSum = fixedSum + variableSum;
+
+      document.getElementById("totalAmountDisplay").textContent = formatEuro(totalSum);
+      document.getElementById("fixedTotalDisplay").textContent = formatEuro(fixedSum);
+      document.getElementById("variableTotalDisplay").textContent = formatEuro(variableSum);
+
+      document.getElementById("fixedCountBadge").textContent = activeFixed.length;
+      document.getElementById("variableCountBadge").textContent = monthVariable.length;
+      document.getElementById("tabCountFixed").textContent = activeFixed.length;
+      document.getElementById("tabCountVariable").textContent = monthVariable.length;
+
+      // Vormonats-Vergleichs-Badge (falls im Vormonat Daten existieren)
+      const prevYM = addMonths(ym, -1);
+      const prevTotal =
+        getActiveFixedForMonth(prevYM).reduce((s, i) => s + i.amount, 0) +
+        getVariableForMonth(prevYM).reduce((s, i) => s + i.amount, 0);
+
+      const trendBadge = document.getElementById("monthTrendBadge");
+      if (prevTotal > 0 && totalSum > 0) {
+        const diffPct = Math.round(((totalSum - prevTotal) / prevTotal) * 100);
+        trendBadge.classList.remove("hidden", "bg-emerald-50", "text-emerald-700", "bg-rose-50", "text-rose-700", "bg-slate-100", "text-slate-600");
+        if (diffPct < 0) {
+          trendBadge.classList.add("bg-emerald-50", "text-emerald-700");
+          trendBadge.textContent = `↓ ${Math.abs(diffPct)} % vs. Vormonat`;
+        } else if (diffPct > 0) {
+          trendBadge.classList.add("bg-rose-50", "text-rose-700");
+          trendBadge.textContent = `↑ ${diffPct} % vs. Vormonat`;
+        } else {
+          trendBadge.classList.add("bg-slate-100", "text-slate-600");
+          trendBadge.textContent = "Wie Vormonat";
+        }
+      } else {
+        trendBadge.classList.add("hidden");
+      }
+
+      // Budget-Karte aktualisieren
+      renderBudgetSection(totalSum, variableSum);
+
+      // Aktiven Tab rendern
+      renderTabsState();
+      if (appState.activeTab === "variable") {
+        renderCategoryFilterBar(monthVariable);
+        renderVariableList(monthVariable);
+      } else if (appState.activeTab === "fixed") {
+        renderFixedList(activeFixed);
+      } else {
+        renderCategoryAnalytics(activeFixed, monthVariable);
+      }
+    }
+
+    function renderBudgetSection(totalSum, variableSum) {
+      const budgetAmount = appState.data.budget.amount;
+      const scope = appState.data.budget.scope;
+      const relevantSpent = scope === "variable" ? variableSum : totalSum;
+
+      const titleLabel = document.getElementById("budgetTitleLabel");
+      const remainingLabel = document.getElementById("budgetRemainingLabel");
+      const progressBar = document.getElementById("budgetProgressBar");
+      const usedRatio = document.getElementById("budgetUsedRatio");
+      const limitText = document.getElementById("budgetLimitText");
+
+      titleLabel.textContent =
+        scope === "variable" ? "Monatsbudget (Nur Variabel)" : "Monatsbudget (Gesamt)";
+
+      if (!budgetAmount || budgetAmount <= 0) {
+        remainingLabel.textContent = "Budget festlegen";
+        remainingLabel.className = "font-semibold text-brand-700";
+        progressBar.style.width = "0%";
+        progressBar.className = "h-full rounded-full bg-slate-300 transition-all duration-300";
+        usedRatio.textContent = "Kein Limit aktiv";
+        limitText.textContent = "Tippen zum Einrichten";
+        return;
+      }
+
+      const ratio = (relevantSpent / budgetAmount) * 100;
+      const clampedWidth = Math.min(100, Math.max(0, ratio));
+      const remaining = budgetAmount - relevantSpent;
+
+      progressBar.style.width = `${clampedWidth.toFixed(1)}%`;
+
+      // Farbübergang: Grün -> Gelb/Amber -> Rot bei Überschreitung
+      if (ratio > 100) {
+        progressBar.className = "h-full rounded-full bg-rose-600 transition-all duration-300";
+        remainingLabel.textContent = `${formatEuro(Math.abs(remaining))} über Budget`;
+        remainingLabel.className = "font-bold tabular-nums text-rose-600";
+      } else if (ratio >= 80) {
+        progressBar.className = "h-full rounded-full bg-amber-500 transition-all duration-300";
+        remainingLabel.textContent = `Noch ${formatEuro(remaining)} frei`;
+        remainingLabel.className = "font-semibold tabular-nums text-amber-700";
+      } else {
+        progressBar.className = "h-full rounded-full bg-emerald-600 transition-all duration-300";
+        remainingLabel.textContent = `Noch ${formatEuro(remaining)} frei`;
+        remainingLabel.className = "font-semibold tabular-nums text-emerald-700";
+      }
+
+      usedRatio.textContent = `${Math.round(ratio)} % von ${formatEuro(budgetAmount)}`;
+      limitText.textContent = "Budget anpassen";
+    }
+
+    function switchTab(tabName) {
+      appState.activeTab = tabName;
+      renderAll();
+    }
+
+    function renderTabsState() {
+      const tabs = [
+        { key: "variable", btnId: "tabBtnVariable", viewId: "viewVariable" },
+        { key: "fixed", btnId: "tabBtnFixed", viewId: "viewFixed" },
+        { key: "categories", btnId: "tabBtnCategories", viewId: "viewCategories" }
+      ];
+
+      tabs.forEach(({ key, btnId, viewId }) => {
+        const btn = document.getElementById(btnId);
+        const view = document.getElementById(viewId);
+        const isActive = appState.activeTab === key;
+
+        if (isActive) {
+          btn.className =
+            "py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 bg-white text-slate-900 shadow-sm";
+          view.classList.remove("hidden");
+        } else {
+          btn.className =
+            "py-2.5 px-3 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-1.5 text-slate-600 hover:text-slate-900";
+          view.classList.add("hidden");
+        }
+      });
+    }
+
+    function renderCategoryFilterBar(monthVariable) {
+      const bar = document.getElementById("categoryFilterBar");
+      const usedCategoryIds = new Set(monthVariable.map((e) => e.category));
+
+      const chips = [
+        { id: "all", name: "Alle", count: monthVariable.length },
+        ...CATEGORIES.filter((c) => usedCategoryIds.has(c.id) || appState.categoryFilter === c.id).map((c) => ({
+          id: c.id,
+          name: c.name,
+          count: monthVariable.filter((e) => e.category === c.id).length
+        }))
+      ];
+
+      bar.innerHTML = chips
+        .map((chip) => {
+          const active = appState.categoryFilter === chip.id;
+          return `
+            <button
+              type="button"
+              onclick="setCategoryFilter('${chip.id}')"
+              class="shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold border transition flex items-center gap-1.5 ${
+                active
+                  ? "bg-brand-700 text-white border-brand-700 shadow-xs"
+                  : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+              }"
+            >
+              <span>${escapeHtml(chip.name)}</span>
+              <span class="text-[10px] tabular-nums ${active ? "text-brand-100" : "text-slate-400"}">${chip.count}</span>
+            </button>
+          `;
+        })
+        .join("");
+    }
+
+    function setCategoryFilter(catId) {
+      appState.categoryFilter = catId;
+      renderAll();
+    }
+
+    function renderVariableList(monthVariable) {
+      const container = document.getElementById("variableExpensesContainer");
+      const query = appState.searchQuery.trim().toLowerCase();
+
+      const filtered = monthVariable.filter((exp) => {
+        if (appState.categoryFilter !== "all" && exp.category !== appState.categoryFilter) {
+          return false;
+        }
+        if (query) {
+          const catName = getCategoryById(exp.category).name.toLowerCase();
+          const amountStr = formatEuro(exp.amount).toLowerCase();
+          return (
+            exp.title.toLowerCase().includes(query) ||
+            catName.includes(query) ||
+            amountStr.includes(query)
+          );
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        const isFiltered = query.length > 0 || appState.categoryFilter !== "all";
+        container.innerHTML = `
+          <div class="bg-white rounded-3xl border border-slate-200/80 p-8 text-center space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-800">
+                ${isFiltered ? "Keine passenden Ausgaben gefunden" : `Noch keine variablen Ausgaben im ${formatMonthYearDE(appState.selectedMonth)}`}
+              </h3>
+              <p class="text-xs text-slate-500 mt-1">
+                ${isFiltered ? "Versuche einen anderen Suchbegriff oder setze den Filter zurück." : "Tippe unten rechts auf das Plus (+), um eine Ausgabe in Sekunden einzutragen."}
+              </p>
+            </div>
+            ${
+              isFiltered
+                ? `<button type="button" onclick="resetFilters()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-semibold text-slate-700 transition">Filter zurücksetzen</button>`
+                : `<button type="button" onclick="openEntryModal('variable')" class="px-4 py-2.5 rounded-xl bg-brand-700 hover:bg-brand-800 text-xs font-semibold text-white shadow-xs transition">+ Erste Ausgabe erfassen</button>`
+            }
+          </div>
+        `;
+        return;
+      }
+
+      // Nach Datum gruppieren
+      const groups = new Map();
+      filtered.forEach((exp) => {
+        if (!groups.has(exp.date)) groups.set(exp.date, []);
+        groups.get(exp.date).push(exp);
+      });
+
+      let html = "";
+      groups.forEach((items, dateStr) => {
+        const dayTotal = items.reduce((sum, item) => sum + item.amount, 0);
+        html += `
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between px-1.5 text-xs font-semibold text-slate-500">
+              <span>${formatGroupDateDE(dateStr)}</span>
+              <span class="tabular-nums text-slate-400">${formatEuro(dayTotal)}</span>
+            </div>
+            <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs divide-y divide-slate-100 overflow-hidden">
+              ${items.map((exp) => renderVariableRow(exp)).join("")}
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function renderVariableRow(exp) {
+      const cat = getCategoryById(exp.category);
+      return `
+        <div class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-slate-50/80 transition group">
+          <button
+            type="button"
+            onclick="openEditVariableModal('${exp.id}')"
+            class="flex items-center gap-3 min-w-0 flex-1 text-left"
+          >
+            <div class="w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${cat.bgClass}">
+              ${cat.icon}
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-semibold text-slate-900 truncate">${escapeHtml(exp.title)}</div>
+              <div class="text-xs text-slate-500 truncate">${escapeHtml(cat.name)}</div>
+            </div>
+          </button>
+
+          <div class="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onclick="openEditVariableModal('${exp.id}')"
+              class="text-sm sm:text-base font-bold text-slate-900 tabular-nums hover:text-brand-700 transition"
+            >
+              ${formatEuro(exp.amount)}
+            </button>
+
+            <button
+              type="button"
+              onclick="deleteVariableExpense('${exp.id}')"
+              aria-label="Ausgabe löschen"
+              title="Ausgabe löschen"
+              class="w-8 h-8 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderFixedList(activeFixed) {
+      const container = document.getElementById("fixedExpensesContainer");
+
+      if (activeFixed.length === 0) {
+        container.innerHTML = `
+          <div class="bg-white rounded-3xl border border-slate-200/80 p-8 text-center space-y-3">
+            <div class="w-12 h-12 rounded-2xl bg-brand-50 text-brand-700 mx-auto flex items-center justify-center">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-800">Keine aktiven Fixkosten im ${formatMonthYearDE(appState.selectedMonth)}</h3>
+              <p class="text-xs text-slate-500 mt-1">
+                Hinterlege hier Miete, Deutschlandticket, Strom oder Abos – sie werden jeden Monat automatisch mitgezählt.
+              </p>
+            </div>
+            <button type="button" onclick="openEntryModal('fixed')" class="px-4 py-2.5 rounded-xl bg-brand-700 hover:bg-brand-800 text-xs font-semibold text-white shadow-xs transition">
+              + Erste Fixkosten anlegen
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs divide-y divide-slate-100 overflow-hidden">
+          ${activeFixed
+            .map((item) => {
+              const cat = getCategoryById(item.category);
+              const dayInfo = item.dayOfMonth ? `zum ${item.dayOfMonth}.` : "monatlich";
+              const sinceInfo = `seit ${formatShortMonthYearDE(item.startMonth)}`;
+              const endInfo = item.endMonth ? ` · bis ${formatShortMonthYearDE(item.endMonth)}` : "";
+
+              return `
+                <div class="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50/80 transition">
+                  <button
+                    type="button"
+                    onclick="openEditFixedModal('${item.id}')"
+                    class="flex items-center gap-3 min-w-0 flex-1 text-left"
+                  >
+                    <div class="w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 ${cat.bgClass}">
+                      ${cat.icon}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <div class="text-sm font-semibold text-slate-900 truncate">${escapeHtml(item.title)}</div>
+                      <div class="text-xs text-slate-500 truncate tabular-nums">
+                        ${escapeHtml(cat.name)} · ${dayInfo} (${sinceInfo}${endInfo})
+                      </div>
+                    </div>
+                  </button>
+
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onclick="openEditFixedModal('${item.id}')"
+                      class="text-sm sm:text-base font-bold text-slate-900 tabular-nums hover:text-brand-700 px-1.5 transition"
+                      title="Betrag oder Details bearbeiten"
+                    >
+                      ${formatEuro(item.amount)}
+                    </button>
+
+                    <button
+                      type="button"
+                      onclick="promptRemoveFixedExpense('${item.id}')"
+                      aria-label="Fixkosten beenden oder löschen"
+                      title="Beenden oder löschen"
+                      class="w-8 h-8 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+      `;
+    }
+
+    function renderCategoryAnalytics(activeFixed, monthVariable) {
+      const scope = appState.categoryChartScope;
+      let combined = [];
+
+      if (scope === "all" || scope === "fixed") {
+        combined = combined.concat(activeFixed.map((f) => ({ category: f.category, amount: f.amount })));
+      }
+      if (scope === "all" || scope === "variable") {
+        combined = combined.concat(monthVariable.map((v) => ({ category: v.category, amount: v.amount })));
+      }
+
+      const grandTotal = combined.reduce((sum, x) => sum + x.amount, 0);
+      const chartWrapper = document.getElementById("categoryChartWrapper");
+      const barsContainer = document.getElementById("categoryBarsContainer");
+
+      if (grandTotal <= 0) {
+        chartWrapper.innerHTML = `
+          <div class="w-full py-6 text-center text-xs text-slate-500">
+            Für diese Auswahl liegen im ${formatMonthYearDE(appState.selectedMonth)} noch keine Ausgaben vor.
+          </div>
+        `;
+        barsContainer.innerHTML = "";
+        return;
+      }
+
+      // Nach Kategorie aggregieren
+      const totalsMap = {};
+      combined.forEach((item) => {
+        totalsMap[item.category] = (totalsMap[item.category] || 0) + item.amount;
+      });
+
+      const sortedStats = Object.entries(totalsMap)
+        .map(([catId, sum]) => ({
+          cat: getCategoryById(catId),
+          sum,
+          pct: (sum / grandTotal) * 100
+        }))
+        .sort((a, b) => b.sum - a.sum);
+
+      // Reines SVG Donut-Diagramm berechnen
+      const radius = 56;
+      const circumference = 2 * Math.PI * radius;
+      let cumulativeOffset = 0;
+
+      const svgSegments = sortedStats
+        .map((entry) => {
+          const dashLength = (entry.pct / 100) * circumference;
+          const segment = `
+            <circle
+              cx="75"
+              cy="75"
+              r="${radius}"
+              fill="transparent"
+              stroke="${entry.cat.color}"
+              stroke-width="20"
+              stroke-dasharray="${dashLength} ${circumference}"
+              stroke-dashoffset="${-cumulativeOffset}"
+              class="transition-all duration-300"
+            />
+          `;
+          cumulativeOffset += dashLength;
+          return segment;
+        })
+        .join("");
+
+      chartWrapper.innerHTML = `
+        <div class="relative w-40 h-40 shrink-0 mx-auto sm:mx-0">
+          <svg viewBox="0 0 150 150" class="w-full h-full -rotate-90">
+            <circle cx="75" cy="75" r="${radius}" fill="transparent" stroke="#F1F5F9" stroke-width="20" />
+            ${svgSegments}
+          </svg>
+          <div class="absolute inset-0 flex flex-col items-center justify-center text-center px-3">
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Summe</span>
+            <span class="text-sm font-extrabold text-slate-900 tabular-nums">${formatEuro(grandTotal)}</span>
+          </div>
+        </div>
+
+        <div class="flex-1 w-full grid grid-cols-2 gap-2">
+          ${sortedStats
+            .slice(0, 6)
+            .map(
+              (entry) => `
+              <div class="flex items-center gap-2 text-xs">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${entry.cat.color}"></span>
+                <span class="truncate text-slate-700 font-medium">${escapeHtml(entry.cat.name)}</span>
+                <span class="ml-auto font-bold text-slate-900 tabular-nums">${Math.round(entry.pct)}%</span>
+              </div>
+            `
+            )
+            .join("")}
+        </div>
+      `;
+
+      // Horizontale Detail-Balken
+      barsContainer.innerHTML = sortedStats
+        .map(
+          (entry) => `
+          <div class="space-y-1">
+            <div class="flex items-center justify-between text-xs sm:text-sm">
+              <div class="flex items-center gap-2 font-semibold text-slate-800">
+                <span class="w-6 h-6 rounded-lg border flex items-center justify-center ${entry.cat.bgClass}">
+                  ${entry.cat.icon}
+                </span>
+                <span>${escapeHtml(entry.cat.name)}</span>
+              </div>
+              <div class="tabular-nums">
+                <span class="font-bold text-slate-900">${formatEuro(entry.sum)}</span>
+                <span class="text-xs text-slate-400 ml-1">(${entry.pct.toFixed(1).replace(".", ",")} %)</span>
+              </div>
+            </div>
+            <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                class="h-full rounded-full transition-all duration-300"
+                style="width: ${entry.pct.toFixed(1)}%; background-color: ${entry.cat.color}"
+              ></div>
+            </div>
+          </div>
+        `
+        )
+        .join("");
+    }
+
+    /* =======================================================================
+       5. SCHNELLEINGABE & BEARBEITUNGS-MODAL LOGIK
+       ======================================================================= */
+    let currentFormState = {
+      mode: "create", // 'create' | 'edit-variable' | 'edit-fixed'
+      type: "variable", // 'variable' | 'fixed'
+      editId: null,
+      selectedCategory: "lebensmittel"
+    };
+
+    function openEntryModal(defaultType = "variable") {
+      currentFormState = {
+        mode: "create",
+        type: defaultType,
+        editId: null,
+        selectedCategory: defaultType === "fixed" ? "wohnen" : "lebensmittel"
+      };
+
+      document.getElementById("entryModalTitle").textContent =
+        defaultType === "fixed" ? "Neue Fixkosten" : "Neue Ausgabe";
+      document.getElementById("entryTypeSwitcher").classList.remove("hidden");
+      document.getElementById("entryAmountInput").value = "";
+      document.getElementById("entryTitleInput").value = "";
+      document.getElementById("entryAmountError").classList.add("hidden");
+      document.getElementById("fixedBillingDayInput").value = "1";
+
+      // Standarddatum: Heute (wenn im aktuellen Monat), sonst der 1. des gewählten Monats
+      const realYM = getCurrentYearMonth();
+      const defaultDate =
+        appState.selectedMonth === realYM ? getLocalTodayISO() : `${appState.selectedMonth}-01`;
+      document.getElementById("entryDateInput").value = defaultDate;
+
+      setEntryFormType(defaultType);
+      document.getElementById("entryModal").classList.remove("hidden");
+
+      // Betragsfeld direkt fokussieren für Zifferntastatur
+      setTimeout(() => {
+        document.getElementById("entryAmountInput").focus();
+      }, 60);
+    }
+
+    function openEditVariableModal(id) {
+      const item = appState.data.expenses.find((e) => e.id === id);
+      if (!item) return;
+
+      currentFormState = {
+        mode: "edit-variable",
+        type: "variable",
+        editId: id,
+        selectedCategory: item.category
+      };
+
+      document.getElementById("entryModalTitle").textContent = "Ausgabe bearbeiten";
+      document.getElementById("entryTypeSwitcher").classList.add("hidden");
+      document.getElementById("entryAmountInput").value = item.amount.toFixed(2).replace(".", ",");
+      document.getElementById("entryTitleInput").value = item.title;
+      document.getElementById("entryDateInput").value = item.date;
+      document.getElementById("entryAmountError").classList.add("hidden");
+
+      setEntryFormType("variable");
+      document.getElementById("entryModal").classList.remove("hidden");
+    }
+
+    function openEditFixedModal(id) {
+      const item = appState.data.fixedExpenses.find((e) => e.id === id);
+      if (!item) return;
+
+      currentFormState = {
+        mode: "edit-fixed",
+        type: "fixed",
+        editId: id,
+        selectedCategory: item.category
+      };
+
+      document.getElementById("entryModalTitle").textContent = "Fixkosten bearbeiten";
+      document.getElementById("entryTypeSwitcher").classList.add("hidden");
+      document.getElementById("entryAmountInput").value = item.amount.toFixed(2).replace(".", ",");
+      document.getElementById("entryTitleInput").value = item.title;
+      document.getElementById("fixedBillingDayInput").value = item.dayOfMonth || 1;
+      document.getElementById("entryAmountError").classList.add("hidden");
+
+      setEntryFormType("fixed");
+      document.getElementById("entryModal").classList.remove("hidden");
+    }
+
+    function closeEntryModal() {
+      document.getElementById("entryModal").classList.add("hidden");
+    }
+
+    function setEntryFormType(type) {
+      currentFormState.type = type;
+      const btnVar = document.getElementById("typeBtnVariable");
+      const btnFix = document.getElementById("typeBtnFixed");
+      const varDateSec = document.getElementById("variableDateSection");
+      const fixOptSec = document.getElementById("fixedOptionsSection");
+      const submitBtn = document.getElementById("saveEntrySubmitBtn");
+
+      if (type === "variable") {
+        btnVar.className = "py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-white text-slate-900 shadow-sm transition";
+        btnFix.className = "py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition";
+        varDateSec.classList.remove("hidden");
+        fixOptSec.classList.add("hidden");
+        submitBtn.textContent =
+          currentFormState.mode === "edit-variable" ? "Änderungen speichern" : "Ausgabe speichern";
+      } else {
+        btnFix.className = "py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold bg-white text-slate-900 shadow-sm transition";
+        btnVar.className = "py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-900 transition";
+        varDateSec.classList.add("hidden");
+        fixOptSec.classList.remove("hidden");
+        document.getElementById("fixedStartMonthHint").textContent =
+          currentFormState.mode === "edit-fixed"
+            ? `Änderungen gelten für ${formatMonthYearDE(appState.selectedMonth)} und folgende Monate.`
+            : `Wird automatisch ab ${formatMonthYearDE(appState.selectedMonth)} in jeden folgenden Monat übernommen.`;
+        submitBtn.textContent =
+          currentFormState.mode === "edit-fixed" ? "Fixkosten aktualisieren" : "Fixkosten speichern";
+      }
+
+      renderQuickPresets();
+      renderEntryCategoryGrid();
+    }
+
+    function renderQuickPresets() {
+      const container = document.getElementById("quickPresetsContainer");
+      const presets = currentFormState.type === "fixed" ? FIXED_PRESETS : VARIABLE_PRESETS;
+
+      container.innerHTML = presets
+        .map(
+          (p, idx) => `
+          <button
+            type="button"
+            onclick="applyQuickPreset(${idx})"
+            class="shrink-0 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-brand-50 text-slate-700 hover:text-brand-800 border border-slate-200/70 hover:border-brand-300 text-xs font-semibold transition active:scale-95"
+          >
+            ${escapeHtml(p.label)}
+          </button>
+        `
+        )
+        .join("");
+    }
+
+    function applyQuickPreset(index) {
+      const presets = currentFormState.type === "fixed" ? FIXED_PRESETS : VARIABLE_PRESETS;
+      const preset = presets[index];
+      if (!preset) return;
+
+      document.getElementById("entryTitleInput").value = preset.title;
+      currentFormState.selectedCategory = preset.category;
+      renderEntryCategoryGrid();
+
+      if (preset.day && currentFormState.type === "fixed") {
+        document.getElementById("fixedBillingDayInput").value = preset.day;
+      }
+
+      const amountInput = document.getElementById("entryAmountInput");
+      if (preset.amount !== null && preset.amount !== undefined) {
+        amountInput.value = preset.amount.toFixed(2).replace(".", ",");
+        document.getElementById("entryAmountError").classList.add("hidden");
+      } else {
+        amountInput.focus();
+      }
+    }
+
+    function renderEntryCategoryGrid() {
+      const grid = document.getElementById("entryCategoryGrid");
+      grid.innerHTML = CATEGORIES.map((cat) => {
+        const selected = currentFormState.selectedCategory === cat.id;
+        return `
+          <button
+            type="button"
+            onclick="selectFormCategory('${cat.id}')"
+            class="flex items-center gap-2 px-2.5 py-2 rounded-xl border text-left text-xs font-semibold transition ${
+              selected
+                ? "border-brand-600 bg-brand-50 text-brand-900 ring-1 ring-brand-600"
+                : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+            }"
+          >
+            <span class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${cat.bgClass}">
+              ${cat.icon}
+            </span>
+            <span class="truncate">${escapeHtml(cat.name)}</span>
+          </button>
+        `;
+      }).join("");
+    }
+
+    function selectFormCategory(catId) {
+      currentFormState.selectedCategory = catId;
+      renderEntryCategoryGrid();
+    }
+
+    function handleEntryFormSubmit(e) {
+      e.preventDefault();
+
+      const amount = parseEuroInput(document.getElementById("entryAmountInput").value);
+      const errorEl = document.getElementById("entryAmountError");
+      if (isNaN(amount) || amount <= 0) {
+        errorEl.classList.remove("hidden");
+        document.getElementById("entryAmountInput").focus();
+        return;
+      }
+      errorEl.classList.add("hidden");
+
+      const catObj = getCategoryById(currentFormState.selectedCategory);
+      const rawTitle = document.getElementById("entryTitleInput").value.trim();
+      const title = rawTitle || catObj.name;
+
+      // Sobald der Nutzer eigene Daten einträgt, Beispieldaten-Status aufheben
+      appState.data.isSampleData = false;
+
+      if (currentFormState.type === "variable") {
+        const dateVal = document.getElementById("entryDateInput").value || getLocalTodayISO();
+
+        if (currentFormState.mode === "edit-variable" && currentFormState.editId) {
+          const idx = appState.data.expenses.findIndex((x) => x.id === currentFormState.editId);
+          if (idx !== -1) {
+            appState.data.expenses[idx] = {
+              ...appState.data.expenses[idx],
+              title,
+              amount,
+              category: currentFormState.selectedCategory,
+              date: dateVal
+            };
+          }
+          saveData();
+          closeEntryModal();
+          appState.selectedMonth = dateVal.slice(0, 7);
+          renderAll();
+          showToast("Ausgabe aktualisiert");
+        } else {
+          appState.data.expenses.push({
+            id: generateId("exp"),
+            title,
+            amount,
+            category: currentFormState.selectedCategory,
+            date: dateVal
+          });
+          saveData();
+          closeEntryModal();
+          appState.selectedMonth = dateVal.slice(0, 7);
+          appState.activeTab = "variable";
+          renderAll();
+          showToast(`${formatEuro(amount)} gespeichert`);
+        }
+      } else {
+        // Fixkosten speichern oder bearbeiten
+        const billingDay = Math.min(31, Math.max(1, parseInt(document.getElementById("fixedBillingDayInput").value, 10) || 1));
+
+        if (currentFormState.mode === "edit-fixed" && currentFormState.editId) {
+          const existing = appState.data.fixedExpenses.find((x) => x.id === currentFormState.editId);
+          if (!existing) return;
+
+          const currentYM = appState.selectedMonth;
+          // Wenn sich der Betrag geändert hat und der Monat nach startMonth liegt, Historie-Option anbieten
+          if (existing.amount !== amount && existing.startMonth < currentYM) {
+            closeEntryModal();
+            promptFixedAmountChange(existing, {
+              title,
+              amount,
+              category: currentFormState.selectedCategory,
+              dayOfMonth: billingDay
+            });
+            return;
+          }
+
+          existing.title = title;
+          existing.amount = amount;
+          existing.category = currentFormState.selectedCategory;
+          existing.dayOfMonth = billingDay;
+
+          saveData();
+          closeEntryModal();
+          renderAll();
+          showToast("Fixkosten aktualisiert");
+        } else {
+          appState.data.fixedExpenses.push({
+            id: generateId("fix"),
+            title,
+            amount,
+            category: currentFormState.selectedCategory,
+            dayOfMonth: billingDay,
+            startMonth: appState.selectedMonth,
+            endMonth: null
+          });
+          saveData();
+          closeEntryModal();
+          appState.activeTab = "fixed";
+          renderAll();
+          showToast(`Fixkosten (${formatEuro(amount)}/Monat) hinzugefügt`);
+        }
+      }
+    }
+
+    /* =======================================================================
+       6. LÖSCHEN & HISTORIE-MANAGEMENT (MIT UNDO & FIXKOSTEN-OPTIONEN)
+       ======================================================================= */
+    let lastDeletedVariable = null;
+    let toastTimeoutId = null;
+
+    function deleteVariableExpense(id) {
+      const idx = appState.data.expenses.findIndex((e) => e.id === id);
+      if (idx === -1) return;
+
+      lastDeletedVariable = appState.data.expenses[idx];
+      appState.data.expenses.splice(idx, 1);
+      saveData();
+      renderAll();
+
+      showToast(`„${lastDeletedVariable.title}“ gelöscht`, () => {
+        if (lastDeletedVariable) {
+          appState.data.expenses.push(lastDeletedVariable);
+          lastDeletedVariable = null;
+          saveData();
+          renderAll();
+          showToast("Wiederhergestellt");
+        }
+      });
+    }
+
+    function promptRemoveFixedExpense(id) {
+      const item = appState.data.fixedExpenses.find((f) => f.id === id);
+      if (!item) return;
+
+      const ym = appState.selectedMonth;
+      const modal = document.getElementById("fixedActionModal");
+      const titleEl = document.getElementById("fixedActionTitle");
+      const descEl = document.getElementById("fixedActionDesc");
+      const btnsEl = document.getElementById("fixedActionButtons");
+
+      titleEl.textContent = `„${item.title}“ entfernen`;
+
+      if (item.startMonth === ym) {
+        descEl.textContent = `Diese Fixkosten wurden erst im ${formatMonthYearDE(ym)} gestartet. Möchtest du sie komplett löschen?`;
+        btnsEl.innerHTML = `
+          <button type="button" onclick="executeDeleteFixedCompletely('${id}')" class="w-full py-3 px-4 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-xs sm:text-sm font-bold transition">
+            Komplett löschen
+          </button>
+          <button type="button" onclick="closeFixedActionModal()" class="w-full py-2.5 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold transition">
+            Abbrechen
+          </button>
+        `;
+      } else {
+        descEl.textContent = `Soll diese Position nur ab ${formatMonthYearDE(ym)} beendet werden (frühere Monate bleiben erhalten) oder komplett aus allen Monaten gelöscht werden?`;
+        btnsEl.innerHTML = `
+          <button type="button" onclick="executeEndFixedFromMonth('${id}', '${ym}')" class="w-full py-3 px-4 rounded-2xl bg-brand-700 hover:bg-brand-800 text-white text-xs sm:text-sm font-bold transition">
+            Ab ${formatMonthYearDE(ym)} beenden (Historie behalten)
+          </button>
+          <button type="button" onclick="executeDeleteFixedCompletely('${id}')" class="w-full py-2.5 px-4 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs sm:text-sm font-semibold transition">
+            Komplett aus allen Monaten löschen
+          </button>
+          <button type="button" onclick="closeFixedActionModal()" class="w-full py-2.5 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold transition">
+            Abbrechen
+          </button>
+        `;
+      }
+
+      modal.classList.remove("hidden");
+    }
+
+    function executeEndFixedFromMonth(id, ym) {
+      const item = appState.data.fixedExpenses.find((f) => f.id === id);
+      if (item) {
+        item.endMonth = addMonths(ym, -1);
+        saveData();
+      }
+      closeFixedActionModal();
+      renderAll();
+      showToast(`Ab ${formatMonthYearDE(ym)} beendet`);
+    }
+
+    function executeDeleteFixedCompletely(id) {
+      appState.data.fixedExpenses = appState.data.fixedExpenses.filter((f) => f.id !== id);
+      saveData();
+      closeFixedActionModal();
+      renderAll();
+      showToast("Fixkosten komplett gelöscht");
+    }
+
+    function promptFixedAmountChange(existing, updatedFields) {
+      const ym = appState.selectedMonth;
+      const modal = document.getElementById("fixedActionModal");
+      document.getElementById("fixedActionTitle").textContent = "Betragsänderung übernehmen";
+      document.getElementById("fixedActionDesc").textContent =
+        `Soll der neue Betrag (${formatEuro(updatedFields.amount)}) erst ab ${formatMonthYearDE(ym)} gelten oder rückwirkend für alle Monate übernommen werden?`;
+
+      document.getElementById("fixedActionButtons").innerHTML = `
+        <button type="button" id="splitFixedAmountBtn" class="w-full py-3 px-4 rounded-2xl bg-brand-700 hover:bg-brand-800 text-white text-xs sm:text-sm font-bold transition">
+          Ab ${formatMonthYearDE(ym)} neuen Betrag nutzen
+        </button>
+        <button type="button" id="overwriteFixedAmountBtn" class="w-full py-2.5 px-4 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-semibold transition">
+          Für alle Monate ändern
+        </button>
+        <button type="button" onclick="closeFixedActionModal()" class="w-full py-2 px-4 rounded-2xl text-slate-500 text-xs font-semibold">
+          Abbrechen
+        </button>
+      `;
+
+      document.getElementById("splitFixedAmountBtn").onclick = () => {
+        const oldEndMonth = existing.endMonth;
+        existing.endMonth = addMonths(ym, -1);
+        appState.data.fixedExpenses.push({
+          id: generateId("fix"),
+          title: updatedFields.title,
+          amount: updatedFields.amount,
+          category: updatedFields.category,
+          dayOfMonth: updatedFields.dayOfMonth,
+          startMonth: ym,
+          endMonth: oldEndMonth
+        });
+        saveData();
+        closeFixedActionModal();
+        renderAll();
+        showToast(`Neuer Betrag ab ${formatMonthYearDE(ym)} aktiv`);
+      };
+
+      document.getElementById("overwriteFixedAmountBtn").onclick = () => {
+        Object.assign(existing, updatedFields);
+        saveData();
+        closeFixedActionModal();
+        renderAll();
+        showToast("Fixkosten aktualisiert");
+      };
+
+      modal.classList.remove("hidden");
+    }
+
+    function closeFixedActionModal() {
+      document.getElementById("fixedActionModal").classList.add("hidden");
+    }
+
+    /* =======================================================================
+       7. BUDGET MODAL, EINSTELLUNGEN, EXPORT & IMPORT
+       ======================================================================= */
+    function openBudgetModal() {
+      const currentBudget = appState.data.budget.amount;
+      document.getElementById("budgetAmountInput").value =
+        currentBudget > 0 ? currentBudget.toFixed(2).replace(".", ",") : "";
+
+      const radios = document.querySelectorAll('input[name="budgetScope"]');
+      radios.forEach((r) => {
+        r.checked = r.value === appState.data.budget.scope;
+      });
+
+      document.getElementById("budgetModal").classList.remove("hidden");
+      setTimeout(() => document.getElementById("budgetAmountInput").focus(), 60);
+    }
+
+    function closeBudgetModal() {
+      document.getElementById("budgetModal").classList.add("hidden");
+    }
+
+    function setBudgetPreset(val) {
+      document.getElementById("budgetAmountInput").value = val.toFixed(2).replace(".", ",");
+    }
+
+    function openSettingsModal() {
+      document.getElementById("resetDataDefaultArea").classList.remove("hidden");
+      document.getElementById("resetDataConfirmArea").classList.add("hidden");
+      document.getElementById("settingsModal").classList.remove("hidden");
+    }
+
+    function closeSettingsModal() {
+      document.getElementById("settingsModal").classList.add("hidden");
+    }
+
+    function triggerDownload(url, filename) {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function exportJSONBackup() {
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        app: "Ausgaben-Manager",
+        version: 1,
+        data: appState.data
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, `ausgaben-backup-${getLocalTodayISO()}.json`);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast("JSON-Backup heruntergeladen");
+    }
+
+    function importJSONBackup(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (evt) {
+        try {
+          const parsed = JSON.parse(evt.target.result);
+          const imported = parsed.data ? parsed.data : parsed;
+          if (!Array.isArray(imported.expenses) || !Array.isArray(imported.fixedExpenses)) {
+            throw new Error("Ungültiges Backup-Format");
+          }
+          appState.data = {
+            isSampleData: false,
+            budget: {
+              amount: Number(imported.budget?.amount) || 0,
+              scope: imported.budget?.scope === "variable" ? "variable" : "total"
+            },
+            expenses: imported.expenses,
+            fixedExpenses: imported.fixedExpenses
+          };
+          saveData();
+          closeSettingsModal();
+          renderAll();
+          showToast("Backup erfolgreich wiederhergestellt");
+        } catch (err) {
+          showToast("Fehler: Datei konnte nicht gelesen werden");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function exportCSV(onlyCurrentMonth) {
+      const rows = [["Typ", "Datum / Monat", "Titel", "Kategorie", "Betrag (EUR)"]];
+      const monthsToExport = onlyCurrentMonth
+        ? [appState.selectedMonth]
+        : collectAllRelevantMonths();
+
+      monthsToExport.forEach((ym) => {
+        getActiveFixedForMonth(ym).forEach((f) => {
+          rows.push([
+            "Fixkosten",
+            `${ym}-${pad2(f.dayOfMonth || 1)}`,
+            f.title,
+            getCategoryById(f.category).name,
+            f.amount.toFixed(2).replace(".", ",")
+          ]);
+        });
+        getVariableForMonth(ym).forEach((v) => {
+          rows.push([
+            "Variabel",
+            v.date,
+            v.title,
+            getCategoryById(v.category).name,
+            v.amount.toFixed(2).replace(".", ",")
+          ]);
+        });
+      });
+
+      const csvContent =
+        "\uFEFF" +
+        rows
+          .map((row) =>
+            row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")
+          )
+          .join("\r\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const suffix = onlyCurrentMonth ? appState.selectedMonth : "gesamt";
+      triggerDownload(url, `ausgaben-${suffix}.csv`);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast("CSV-Datei heruntergeladen");
+    }
+
+    function collectAllRelevantMonths() {
+      const set = new Set([appState.selectedMonth]);
+      appState.data.expenses.forEach((e) => {
+        if (e.date) set.add(e.date.slice(0, 7));
+      });
+      appState.data.fixedExpenses.forEach((f) => {
+        if (f.startMonth) set.add(f.startMonth);
+      });
+      return Array.from(set).sort();
+    }
+
+    function clearAllDataToEmpty() {
+      appState.data = {
+        isSampleData: false,
+        budget: { amount: 0, scope: "total" },
+        expenses: [],
+        fixedExpenses: []
+      };
+      saveData();
+      closeSettingsModal();
+      renderAll();
+      showToast("Alle Daten geleert – bereit für deine Ausgaben!");
+    }
+
+    function resetFilters() {
+      appState.searchQuery = "";
+      appState.categoryFilter = "all";
+      document.getElementById("searchInput").value = "";
+      renderAll();
+    }
+
+    function showToast(message, undoCallback = null) {
+      const banner = document.getElementById("toastBanner");
+      const msgEl = document.getElementById("toastMessage");
+      const undoBtn = document.getElementById("toastUndoBtn");
+
+      msgEl.textContent = message;
+      if (undoCallback) {
+        undoBtn.classList.remove("hidden");
+        undoBtn.onclick = () => {
+          undoCallback();
+          banner.classList.add("hidden");
+        };
+      } else {
+        undoBtn.classList.add("hidden");
+        undoBtn.onclick = null;
+      }
+
+      banner.classList.remove("hidden");
+      if (toastTimeoutId) clearTimeout(toastTimeoutId);
+      toastTimeoutId = setTimeout(() => {
+        banner.classList.add("hidden");
+      }, undoCallback ? 4500 : 2600);
+    }
+
+    /* =======================================================================
+       8. EVENT-LISTENER & INITIALISIERUNG
+       ======================================================================= */
+    function bindEventListeners() {
+      // Monatsnavigation
+      document.getElementById("prevMonthBtn").addEventListener("click", () => {
+        appState.selectedMonth = addMonths(appState.selectedMonth, -1);
+        renderAll();
+      });
+
+      document.getElementById("nextMonthBtn").addEventListener("click", () => {
+        appState.selectedMonth = addMonths(appState.selectedMonth, 1);
+        renderAll();
+      });
+
+      const jumpToday = () => {
+        appState.selectedMonth = getCurrentYearMonth();
+        renderAll();
+      };
+      document.getElementById("jumpTodayBtn").addEventListener("click", jumpToday);
+      document.getElementById("currentMonthLabelBtn").addEventListener("click", jumpToday);
+
+      // Beispieldaten schnell leeren
+      document.getElementById("quickClearSampleBtn").addEventListener("click", () => {
+        clearAllDataToEmpty();
+      });
+
+      // Suche
+      document.getElementById("searchInput").addEventListener("input", (e) => {
+        appState.searchQuery = e.target.value;
+        renderVariableList(getVariableForMonth(appState.selectedMonth));
+      });
+
+      // Kategorie-Diagramm-Scope
+      document.querySelectorAll(".cat-scope-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          appState.categoryChartScope = btn.dataset.catScope;
+          document.querySelectorAll(".cat-scope-btn").forEach((b) => {
+            if (b === btn) {
+              b.className = "cat-scope-btn px-2.5 py-1 rounded-lg bg-white text-slate-900 shadow-sm";
+            } else {
+              b.className = "cat-scope-btn px-2.5 py-1 rounded-lg text-slate-600";
+            }
+          });
+          renderCategoryAnalytics(
+            getActiveFixedForMonth(appState.selectedMonth),
+            getVariableForMonth(appState.selectedMonth)
+          );
+        });
+      });
+
+      // FAB & Entry Modal
+      document.getElementById("fabAddBtn").addEventListener("click", () => {
+        openEntryModal(appState.activeTab === "fixed" ? "fixed" : "variable");
+      });
+      document.getElementById("closeEntryModalBtn").addEventListener("click", closeEntryModal);
+      document.getElementById("entryModalBackdrop").addEventListener("click", closeEntryModal);
+      document.getElementById("entryForm").addEventListener("submit", handleEntryFormSubmit);
+
+      document.getElementById("dateQuickTodayBtn").addEventListener("click", () => {
+        document.getElementById("entryDateInput").value = getLocalTodayISO();
+      });
+      document.getElementById("dateQuickYesterdayBtn").addEventListener("click", () => {
+        document.getElementById("entryDateInput").value = getLocalYesterdayISO();
+      });
+
+      // Budget Modal
+      document.getElementById("budgetCardTrigger").addEventListener("click", openBudgetModal);
+      document.getElementById("budgetCardTrigger").addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openBudgetModal();
+        }
+      });
+      document.getElementById("budgetModalBackdrop").addEventListener("click", closeBudgetModal);
+      document.getElementById("budgetForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const raw = document.getElementById("budgetAmountInput").value.trim();
+        const parsed = raw === "" ? 0 : parseEuroInput(raw);
+        const scope = document.querySelector('input[name="budgetScope"]:checked')?.value || "total";
+
+        appState.data.budget = {
+          amount: !isNaN(parsed) && parsed > 0 ? parsed : 0,
+          scope
+        };
+        saveData();
+        closeBudgetModal();
+        renderAll();
+        showToast("Monatsbudget gespeichert");
+      });
+
+      // Fixkosten Action Modal Backdrop
+      document.getElementById("fixedActionBackdrop").addEventListener("click", closeFixedActionModal);
+
+      // Settings Modal
+      document.getElementById("openSettingsBtn").addEventListener("click", openSettingsModal);
+      document.getElementById("settingsModalBackdrop").addEventListener("click", closeSettingsModal);
+
+      // App-Icon Download Buttons
+      document.getElementById("downloadIconPngBtn").addEventListener("click", () => {
+        if (generatedIconPng512) {
+          triggerDownload(generatedIconPng512, "ausgaben-app-icon-512.png");
+          showToast("PNG-App-Icon heruntergeladen");
+        } else {
+          showToast("PNG wird noch vorbereitet...");
+        }
+      });
+
+      document.getElementById("downloadIconSvgBtn").addEventListener("click", () => {
+        const blob = new Blob([APP_ICON_SVG], { type: "image/svg+xml;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        triggerDownload(url, "ausgaben-app-icon.svg");
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast("SVG-App-Icon heruntergeladen");
+      });
+
+      // Backup & CSV Export/Import
+      document.getElementById("exportJsonBtn").addEventListener("click", exportJSONBackup);
+      document.getElementById("importJsonInput").addEventListener("change", (e) => {
+        importJSONBackup(e.target.files[0]);
+        e.target.value = "";
+      });
+      document.getElementById("exportCsvMonthBtn").addEventListener("click", () => exportCSV(true));
+      document.getElementById("exportCsvAllBtn").addEventListener("click", () => exportCSV(false));
+
+      // Reset Confirmation im Settings Modal
+      document.getElementById("triggerResetConfirmBtn").addEventListener("click", () => {
+        document.getElementById("resetDataDefaultArea").classList.add("hidden");
+        document.getElementById("resetDataConfirmArea").classList.remove("hidden");
+      });
+      document.getElementById("cancelClearAllBtn").addEventListener("click", () => {
+        document.getElementById("resetDataConfirmArea").classList.add("hidden");
+        document.getElementById("resetDataDefaultArea").classList.remove("hidden");
+      });
+      document.getElementById("confirmClearAllBtn").addEventListener("click", clearAllDataToEmpty);
+
+      // Escape-Taste schließt geöffnete Modals
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeEntryModal();
+          closeBudgetModal();
+          closeFixedActionModal();
+          closeSettingsModal();
+        }
+      });
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      initDynamicAppIconAndManifest();
+      loadData();
+      bindEventListeners();
+      renderAll();
+    });
+  </script>
+</body>
+</html>
